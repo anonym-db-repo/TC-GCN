@@ -113,8 +113,6 @@ class CausualGCN:
         x1 += x1_raw
         x2 += x2_raw
 
-
-        # 判断错骨节点
         x1_node_semantics = x1  # [-1, 50, 25, 512]
         x2_node_semantics = x2  # [-1, 20, 25, 512]
 
@@ -151,8 +149,7 @@ class CausualGCN:
         # x1_recent = x1_node_semantics
         # x1_recent = K.squeeze(x1_recent, axis=1)
 
-        # 判别骨节点错误
-
+        # Joint-level forgery
         nb_joint_feat = 256
         x1_node_rep = layers.Dense(nb_joint_feat, activation=mid_act_fun, name='x1_joint_dense1')(x1_recent)
         x1_node_rep = K.tile(K.expand_dims(x1_node_rep, axis=1), [1, x2.shape[1], 1, 1])
@@ -169,8 +166,7 @@ class CausualGCN:
         # x1_x2_merge_interact = layers.multiply([x1_node_rep, x2_node_rep])
         self.node_score = layers.Dense(3, activation='softmax', name='node_score')(x1_x2_merge_interact[:, 0])
 
-        # 判别第一帧的位置
-
+        # Next-frame detection
         nb_frame_feat = 256
 
         # model I
@@ -212,7 +208,7 @@ class CausualGCN:
             y_true = K.one_hot(K.cast(y_true, np.int32), K.shape(y_pred)[-1])
             return K.mean(keras.losses.binary_crossentropy(y_true, y_pred))
 
-        # 判断video是否有错帧
+        # Action-level forgery
         nb_video_feat = 256
         # model I
         # x1_video_semantics = layers.Flatten()(x1_node_semantics)  # [-1, 25*128]

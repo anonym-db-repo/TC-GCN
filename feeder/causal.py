@@ -1,14 +1,19 @@
-import numpy
 import numpy as np
 import scipy.signal as sps
-from collections import deque
+
 
 eps = np.finfo(float).eps
+
 
 def normalize(a, order=2, axis=-1):
     l2 = np.atleast_1d(np.linalg.norm(a, order, axis))
     l2[l2 == 0] = 1
     return a / np.expand_dims(l2, axis)
+
+def standardize(a, axis=-1):
+    means = np.mean(a, axis=axis, keepdims=True)
+    stds = np.std(a, axis=axis, keepdims=True)
+    return (a - means) / stds
 
 
 def embed_data(x, order, lag):
@@ -19,59 +24,35 @@ def embed_data(x, order, lag):
     for i in range(order):
         u[i*ch:(i+1)*ch] = x[:, hidx[i]:hidx[i]+Nv]
 
-    return u.T
+    return u
 
 
 def pTE(z, lag=1, model_order=1, to_norm=False):
-    """Returns pseudo transfer entropy.
-
-    Parameters
-    ----------
-    z : array
-        array of arrays, containing all the time series.
-    lag : integer
-        delay of the embedding.
-    model_order : integer
-        embedding dimension, or model order.
-    surr : boolean
-        if True it computes the maximum value obtained using 19 times shifted
-        surrogates
-
-    Returns
-    -------
-    pte : array
-        array of arrays. The dimension is (# time series, # time series).
-        The diagonal is 0, while the off diagonal term (i, j) corresponds
-        to the pseudo transfer entropy from time series i to time series j.
-    """
-
     NN, C, T = np.shape(z)
     pte = np.zeros((NN, NN))
     if to_norm:
-        z = normalize(sps.detrend(z))
+        z = standardize(sps.detrend(z))
     nodes = np.arange(NN, step=1)
 
     for i in nodes:
         EmbdDumm = embed_data(z[i], model_order + 1, lag)
-        Xtau = EmbdDumm[:, :-C]
+        Xtau = EmbdDumm[:-C]
         for j in nodes:
             if i != j:
                 Yembd = embed_data(z[j], model_order + 1, lag)
-                Y = Yembd[:, -C:]
-                Ytau = Yembd[:, :-C]
-                XtYt = np.concatenate((Xtau, Ytau), axis=1)
-                YYt = np.concatenate((Y, Ytau), axis=1)
-                YYtXt = np.concatenate((YYt, Xtau), axis=1)
+                Y = Yembd[-C:]
+                Ytau = Yembd[:-C]
+                XtYt = np.concatenate((Xtau, Ytau), axis=0)
+                YYt = np.concatenate((Y, Ytau), axis=0)
+                YYtXt = np.concatenate((YYt, Xtau), axis=0)
 
-                if model_order > 1 or C > 1:
-                    ptedum = np.linalg.det(np.cov(XtYt.T)) * np.linalg.det(np.cov(YYt.T)) / \
-                             (np.linalg.det(np.cov(YYtXt.T)) * np.linalg.det(np.cov(Ytau.T)) + eps)
-                else:
-                    ptedum = np.linalg.det(np.cov(XtYt.T)) * np.linalg.det(np.cov(YYt.T)) / \
-                             (np.linalg.det(np.cov(YYtXt.T)) * np.cov(Ytau.T) + eps)
+                H_XtYt = np.linalg.det(np.cov(XtYt))
+                H_YYt = np.linalg.det(np.cov(YYt))
+                H_YYtXt = np.linalg.det(np.cov(YYtXt))
+                H_Ytau = np.linalg.det(np.cov(Ytau))
 
-                if ptedum > 0:
-                    pte[i, j] = 0.5 * np.log(ptedum)
+                if H_XtYt > 0 and H_YYt > 0 and H_YYtXt > 0 and H_Ytau > 0:
+                    pte[i, j] = 0.5 * (np.log(H_XtYt) + np.log(H_YYt) - np.log(H_YYtXt) - np.log(H_Ytau))
 
     return pte
 

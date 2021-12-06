@@ -38,7 +38,7 @@ if __name__ == '__main__':
 
     # np.save('../data/Skeleton_Data/NTU-RGB-D/x_sub/train_data_causal_matrices_20.npy', np.array(causal_matrices))
 
-    # 计算 global_type_matrices
+    # compute category-level causal matrices
     matrices = np.load('../data/Skeleton_Data/NTU-RGB-D/x_sub/train_data_causal_matrices_20.npy')  # [-1. 25, 25]
     _, labels = np.load(label_path, allow_pickle=True)
     labels = np.array(labels)
